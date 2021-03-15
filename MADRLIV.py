@@ -3,9 +3,9 @@ import matplotlib.pyplot as plt
 import random
 from tqdm import tqdm
 
-from IT import Aggregator
-from IT import autogenerate_votes
-from IT import find_winner
+from voting_tools import Aggregator
+from voting_tools import autogenerate_votes
+from voting_tools import find_winner
 import matplotlib.animation as animation
 
 import os, sys
@@ -14,16 +14,16 @@ import warnings
 import time
 import pandas as pd
 
-from MARLIV_agents import Agent, Gradient_Agent,Neural_Agent,Bot
+from voting_agents import Agent, Gradient_Agent,Neural_Agent,Bot
 
 print_vote_diagnostics = False
 print_final_diag=False
-last_rewards_instead = False #plots last rewwards instead of anything else
+last_rewards_instead = False #plots last rewards instead of anything else
 warnings.filterwarnings("ignore")
 
 
 # =========================
-# Calculate Utilities
+# General Utility
 # =========================
 
 def producetimefolder():
@@ -44,7 +44,17 @@ def moving_std(a, n=3):
     out = out[np.logical_not(np.isnan(out))]
     return out
 
+def random_color():
+    r = random.random()
+    b = random.random()
+    g = random.random()
+    colour1 = (r, g, b)
+    colour2 = (0.5*r,0.5*g,0.5*b)
+    return colour1, colour2
 
+# =========================
+# Calculate Utilities from pref ranks, either exponential or linear
+# =========================
 
 def get_utility(rank,use_exp,options):
     #outputs utility if given rank order of option
@@ -62,11 +72,22 @@ def util_from_ranks(rank_list,use_exp,options):
     return out
 
 
+def utility_of_result(answer,options,voting_ranks,use_exp):
+    index = options.index(answer)
+    final_util = []
+    for r in voting_ranks:
+        utils = util_from_ranks(r,use_exp,options)
+        util = utils[index]
+        final_util.append(util)
+    
+    return (float(np.min(np.array(final_util))), float(np.mean(np.array(final_util))))
+
+
 # =========================
 # Define Bandit and Agent class
 # =========================
 class Bandit:
-
+    "Runs each round of voting and stores information needed to feed as state inputs to agents"
     def __init__(self, ranks,options,n_vot):
         self.candidates = options
         self.nvot = n_vot
@@ -96,7 +117,6 @@ class Bandit:
             if c not in agents_votes:
                 agents_votes.append(c)
 
-        #print("voting for", agents_votes)
         self.votes[1][voter_id] = agents_votes
 
 
@@ -109,8 +129,6 @@ class Bandit:
 
         self.votes = self.voting_environment()
 
-        #print("cands,", self.candidates)
-        #print(actions)
         for idx,action in enumerate(actions):
             self.add_to_environment(action,idx) #pick different voter id to give different voter
 
@@ -119,19 +137,15 @@ class Bandit:
         result = getattr(contest,voting_method)()
         result = [(value, key) for key, value in result.items()]
 
-        #random.shuffle(result)#for random picking of winner
-        #print("\n\nTo pick:", result)
-        largest = max(result)[0] #note this is unfair nd will randomly pick one winner if there's a tie
+        largest = max(result)[0]
+        #random tiebreak
 
         winners = [i for i in result if i[0] == largest]
-        #print("winners:", winners)
         winner = random.choice(winners)[1]
 
         self.vote_winners.append(winner)
 
         final = self.candidates.index(winner)
-        #print(contest)
-        #print("DEBUG C/W/F:",self.candidates,winner,final)
 
         rewards = []
         for idx,action in enumerate(actions):
@@ -140,65 +154,60 @@ class Bandit:
             reward = get_utility(rank,use_exp,options)
             rewards.append(reward)
 
-        #print("winner=",winner," reward=", rewards)
         self.last_rewards = rewards
         self.last_actions = actions
         return rewards
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def generate_partial_action_input(N, partial):
+    "Needed for sequential voting - creates list of actions already taken and pads to full length"
     to_pad = N - len(partial)
     partial = np.array(partial) + 1
     
     state_output = np.pad(partial,(0,to_pad))
     return state_output
 
-def experiment(agents, bandit, N_episodes, decline,voting_method,use_exp,options,winner_to_compare=None,pbar=None):
+
+def experiment(agents, bandit, N_episodes, decline,voting_method,use_exp,options,winner_to_compare=None,pbar=None,agent_reward_N=None):
+    """Runs single iterative voting experiment and outputs the relevant variable being tested.
+    if agent_reward_N is not None, will output the reward given to agent N.
+    Otherwise outputs condorcet efficiency (if winner_to_compare is str - the condorcet winner)
+    or borda score/max borda score (if winner_to_compare is dict and borda scores for each winner)
+
+    Args:
+        agents (list): list of agents with classes given in voting_agents
+        bandit (Bandit): the bandit object
+        N_episodes (int): how many steps of IV
+        decline (bool): whether to decline epsilon
+        voting_method (str): voting method to use for voting round. should be 'plurality'
+        use_exp (bool): True for exponentially declining reward, False for linearly declining
+        options (list): list of candidates (should be of form ['A','B','C'...])
+        winner_to_compare (str or dict, optional): Either a str that is the unique condorcet winner or dict of borda scores. Defaults to None.
+        pbar (tqdm, optional): tqdm object. Defaults to None.
+
+    Returns:
+        voting metric: np.array object of length N_episodes with borda/condorcet scores or reward of agent N
+    """
     reward_history = []
     for episode in range(N_episodes+1):
         actions = []
         for agent in agents:
+            #for if sequential voting is being used
             input = generate_partial_action_input(len(agents),actions)
             bandit.partial_result = input
 
+            #Obtain agent actions
             action = agent.get_action(bandit, episode, decline, N_episodes)
             actions.append(action)
 
-
+        #calculate winner of election
         rewards = bandit.get_rewards(actions,voting_method,use_exp,options)
 
+        #update each agent with their rewards
         for idx,agent in enumerate(agents):
             agent.update_Q(actions[idx], rewards[idx])
+
+        #DEBUG
         if print_vote_diagnostics == True:
             arw = []
             for idx in range(len(actions)):
@@ -210,6 +219,7 @@ def experiment(agents, bandit, N_episodes, decline,voting_method,use_exp,options
         if episode % 10 == 9:
             done = str(round(100*float(episode)/float(N_episodes), 1))
             if type(winner_to_compare) is str:
+                #Measuring condorcet efficiency
                 ret = 'cw'
                 out = []
                 winners = bandit.vote_winners
@@ -221,6 +231,7 @@ def experiment(agents, bandit, N_episodes, decline,voting_method,use_exp,options
                 out = np.array(out)
 
             elif type(winner_to_compare) is dict:
+                #Measuring borda score
                 ret = 'borda'
                 singlewin = lambda x : x[0]
                 winner = singlewin(find_winner(winner_to_compare))
@@ -236,6 +247,7 @@ def experiment(agents, bandit, N_episodes, decline,voting_method,use_exp,options
                 pbar.set_description(done)
         
     if print_final_diag is True:
+        #fpr diagnostics
         print("\n\n\nDUMP:")
         for a in agents:
             print(vars(a))
@@ -243,16 +255,14 @@ def experiment(agents, bandit, N_episodes, decline,voting_method,use_exp,options
         for k in banditv.keys():
             print(k, banditv[k])
         print("DUMP over\n\n\n")
-
-
-    if print_final_diag is True:
         print(out[::50])
     
-    if last_rewards_instead is True:
+    if agent_reward_N is not None:
+        #outputs rewards instead of borda/cw
         result = []
         for r in reward_history:
-            result.append(r[-1])
-        return result
+            result.append(r[agent_reward_N])
+        return np.array(result)
     else:
         return out
     
@@ -268,57 +278,28 @@ def experiment(agents, bandit, N_episodes, decline,voting_method,use_exp,options
 
 
 
-
-
-
-
-
-
-def utility_of_result(answer,options,voting_ranks,use_exp):
-    index = options.index(answer)
-    final_util = []
-    for r in voting_ranks:
-        utils = util_from_ranks(r,use_exp,options)
-        util = utils[index]
-        final_util.append(util)
-    
-    return (float(np.min(np.array(final_util))), float(np.mean(np.array(final_util))))
-
-def random_color():
-    r = random.random()
-    b = random.random()
-    g = random.random()
-    colour1 = (r, g, b)
-    colour2 = (0.5*r,0.5*g,0.5*b)
-    return colour1, colour2
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # =========================
 # Filter preference profiles
 # =========================
 
 
 def unique_nontrival_winner(NC,NV,measure,restrict,correlation_const=None):
+    """ Used to produce preference profiles for IV. If measure is condorcet winner (pairwise_comparison), ensures unique condorcet winner
+    otherwise, if restrict is True, ensures there is only a single winner by measure and that it is not the plurality winner(s)
+    if restrict is False, just ensures output makes sense according to measure
+    if restrict is 'partial', ensures plurality winner(s) != measure winner(s)
+
+    Args:
+        NC (int): number of candidates
+        NV (int): number of voters
+        measure (str): borda or pairwise_comparison - metric used to filter profiles
+        restrict (bool or str): True, False or partial
+        correlation_const (float): correlation constant for correlating similar profiles. Defaults to None.
+
+    Returns:
+        opt,vr, metric_results,plurality_results
     """
 
-    Finds a preference ordering for each voter that has a single borda/condorcet winner (measure)
-    and isn't the same as the plurality winner
-
-    """
     #print("\nSearching...",NC, NV)
     single_winner = False
     while single_winner is False:
@@ -359,6 +340,10 @@ def unique_nontrival_winner(NC,NV,measure,restrict,correlation_const=None):
     return opt,vr, metric_results,plurality_results
 
 def generate_agent(ag_type,bandit,epsilon,alpha,update_interval,memory=False,bot_prefs=None):
+    """
+    Produces agent from voting_agents with the given parameters, including memory types, update interval, exploration rate, learning rate
+    """
+
     if memory not in [False,'Rewards','Actions','Actions_now']:
         print(memory, ag_type,"No such agent exists")
         return
@@ -378,6 +363,15 @@ def generate_agent(ag_type,bandit,epsilon,alpha,update_interval,memory=False,bot
             print("No bot Prefs")
     else:
         print(ag_type, "No such agent exists")
+
+
+
+
+
+# =========================
+# Used for keeping agents and their preference profiles together
+# =========================
+
 
 def pack_agentdict(voting_ranks,agent_list):
     out = {}
@@ -400,74 +394,26 @@ def unpack_agentdict(bandit,voting_ranks,agentlist,agentdict):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# =========================
-# Streamlined method to generate test agents
-# =========================
-
-
 def test_agents(ag_type,to_remember,pref_profile,agent_dict = {}, N_episodes=1000,epsilon=0.1,alpha=0.1,use_exp=True,use_cw=False,DEC=False,restrict=False,neural_update_interval=2,pbar=None):
-    """runs single experiment testing chosen agent in multiagent iterative plurality voting
-
-    Args:
-        ag_type ([type]): name of agent type
-        voting_method (str, optional): what method is used to decide votes. Don't change from plurality. Defaults to 'plurality'.
-        N_episodes (int, optional): How many time steps to run for. Defaults to 1000.
-        epsilon (float, optional): for tabular only, exploration rate (or starting exploration rate). Defaults to 0.1.
-        alpha (float, optional): learning rate for tabular and gradient. Defaults to 0.1.
-        use_exp (bool, optional): If true use exponential reward. if false use linear reward. Defaults to True.
-        use_cw (bool, optional): test condorcet efficiency and generate a unique condorcet winner if true, test borda and generate unique borda if false. Defaults to False.
-        DEC (bool, optional): decline epsilon or hold constant. Defaults to False.
-        restrict (bool, optional): if true, restricts autogenerated votes so winner is not trival. Defaults to False.
-        CV (tuple, optional): tuple of candidate,vote. If exists fits to data Defaults to None.
-        alpha_corr ([type], optional): autogenerating vote correlation coefficient from paper. Defaults to None.
-
-    Returns:
-        social_scores (array): mean per timestep per random reroll social score (either borda score/max borda score for each or condorcet efficiency for each)
     """
+    Generates a test sequence for 
 
-    voting_method='plurality'
+    """
+    voting_method='plurality' #has to be
     
-    singlewin = lambda x : x[0] if len(x) == 1 else None
+    singlewin = lambda x : x[0] if len(x) == 1 else None #gets THE single winner or returns None, causing later errors if this isn't true. needed to detect errors
 
     if use_cw is True:
         metric = 'pairwise_comparison'
     elif use_cw is False:
         metric = 'borda'
+
     options = pref_profile[0]
     voting_ranks = pref_profile[1]
+
     comparison = Aggregator(inputs=pref_profile)
     metric_results = getattr(comparison,metric)()
     plurality_results = comparison.plurality()
-
 
 
     if use_cw is True:
@@ -475,7 +421,8 @@ def test_agents(ag_type,to_remember,pref_profile,agent_dict = {}, N_episodes=100
     elif use_cw is False:
         metric = 'borda'
         if restrict == False:
-            singlewin = lambda x : x[0]
+            singlewin = lambda x : x[0] #if
+    
     """
     if print_vote_diagnostics is True:
         #print("Random cycle #", count)
@@ -566,6 +513,20 @@ def test_agents(ag_type,to_remember,pref_profile,agent_dict = {}, N_episodes=100
 
 
 def plot_singlepref(fold,mems,agent_types,pref_profile,agent_alpha,N_tests,percent,metric='borda_score',eps_len=1200,updateinterval=2):
+    """[summary]
+
+    Args:
+        fold ([type]): [description]
+        mems ([type]): [description]
+        agent_types ([type]): [description]
+        pref_profile ([type]): [description]
+        agent_alpha ([type]): [description]
+        N_tests ([type]): [description]
+        percent ([type]): [description]
+        metric (str, optional): [description]. Defaults to 'borda_score'.
+        eps_len (int, optional): [description]. Defaults to 1200.
+        updateinterval (int, optional): [description]. Defaults to 2.
+    """
     global last_rewards_instead
     last_rewards_instead = False
 
