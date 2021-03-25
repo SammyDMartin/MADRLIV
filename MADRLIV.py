@@ -18,7 +18,6 @@ from voting_agents import Agent, Gradient_Agent,Neural_Agent,Bot
 
 print_vote_diagnostics = False
 print_final_diag=False
-last_rewards_instead = False #plots last rewards instead of anything else
 warnings.filterwarnings("ignore")
 
 
@@ -98,6 +97,7 @@ class Bandit:
         self.last_rewards = [0 for x in range(self.nvot)]
         self.last_actions = [0 for x in range(self.nvot)]
         self.partial_result = None
+        self.vote_history = []
 
     def voting_environment(self):
         "Generates random voting environment"
@@ -203,6 +203,8 @@ def experiment(agents, bandit, N_episodes, decline,voting_method,use_exp,options
         #calculate winner of election
         rewards = bandit.get_rewards(actions,voting_method,use_exp,options)
 
+        bandit.vote_history.append(actions)
+
         #update each agent with their rewards
         for idx,agent in enumerate(agents):
             agent.update_Q(actions[idx], rewards[idx])
@@ -262,9 +264,9 @@ def experiment(agents, bandit, N_episodes, decline,voting_method,use_exp,options
         result = []
         for r in reward_history:
             result.append(r[agent_reward_N])
-        return np.array(result)
+        return np.array(result), bandit
     else:
-        return out
+        return out, bandit
     
     if print_vote_diagnostics is True:
         for idx, r in enumerate(reward_history[:10]):
@@ -461,7 +463,7 @@ def test_agents(ag_type,to_remember,pref_profile,agent_dict = {}, N_episodes=100
             print(metric, metric_results)
             print("CW error!")
             raise ValueError
-        reward_history = experiment(agents, bandit, N_episodes, DEC,voting_method,use_exp,options,score_maximised,pbar=pbar)  # perform experiment
+        reward_history, bandit = experiment(agents, bandit, N_episodes, DEC,voting_method,use_exp,options,score_maximised,pbar=pbar)  # perform experiment
     else:
         if type(metric_results) is not dict:
             print(type(metric_results))
@@ -470,7 +472,7 @@ def test_agents(ag_type,to_remember,pref_profile,agent_dict = {}, N_episodes=100
             print(metric,metric_results)
             print("Borda error!")
             raise ValueError
-        reward_history = experiment(agents, bandit, N_episodes, DEC,voting_method,use_exp,options,metric_results,pbar=pbar)
+        reward_history, bandit = experiment(agents, bandit, N_episodes, DEC,voting_method,use_exp,options,metric_results,pbar=pbar)
     #print(i, np.mean(reward_history))
     reward_history_avg = np.array(reward_history)
 
@@ -489,7 +491,7 @@ def test_agents(ag_type,to_remember,pref_profile,agent_dict = {}, N_episodes=100
         pbar.update(1)
 
     
-    return reward_history_avg, pack_agentdict(voting_ranks,agents)
+    return reward_history_avg, (pack_agentdict(voting_ranks,agents),bandit)
 
 
 
@@ -527,8 +529,6 @@ def plot_singlepref(fold,mems,agent_types,pref_profile,agent_alpha,N_tests,perce
         eps_len (int, optional): [description]. Defaults to 1200.
         updateinterval (int, optional): [description]. Defaults to 2.
     """
-    global last_rewards_instead
-    last_rewards_instead = False
 
     comparison = Aggregator(inputs=pref_profile)
     if metric == "borda_score":
@@ -537,11 +537,16 @@ def plot_singlepref(fold,mems,agent_types,pref_profile,agent_alpha,N_tests,perce
         metric_results = getattr(comparison,"pairwise_comparison")()
     plurality_results = comparison.plurality()
     
-    plt.figure(figsize=(20,20))
+    if fold is not None:
+        plt.figure(figsize=(20,20))
+    else:
+        plt.figure(figsize=(15,15))
 
     limr = N_tests * len(mems)*len(agent_types)
 
     pbar = tqdm(total=limr,ncols=100)
+
+    res_dict = {}
     
     for mem in mems:
         for agent_type in agent_types:
@@ -556,8 +561,14 @@ def plot_singlepref(fold,mems,agent_types,pref_profile,agent_alpha,N_tests,perce
             x = []
             y = []
 
+            ls=[]
+
+
             for T in range(N_tests):
-                reward_seq,_ = test_agents(agent_type,mem,pref_profile,agent_dict={},N_episodes=eps_len,epsilon=0.1,alpha=a,pbar=pbar)
+                e=0.1
+                reward_seq,agents = test_agents(agent_type,mem,pref_profile,agent_dict={},N_episodes=eps_len,epsilon=e,alpha=a,pbar=pbar)
+
+                ls.append(agents)
 
                 interv = int((percent/100)*len(reward_seq))
 
@@ -567,6 +578,8 @@ def plot_singlepref(fold,mems,agent_types,pref_profile,agent_alpha,N_tests,perce
 
                 x.append(np.mean(first))
                 y.append(np.mean(last))
+            
+            res_dict[(mem,agent_type)] = ls
 
 
             
@@ -590,19 +603,22 @@ def plot_singlepref(fold,mems,agent_types,pref_profile,agent_alpha,N_tests,perce
 
     plt.title(title)
 
-    savestr = time.strftime("%H %M %S")
-    savestr = fold+str(savestr)+"2dp_"+str(metric)
+    if fold is not None:
+        savestr = time.strftime("%H %M %S")
+        savestr = fold+str(savestr)+"2dp_"+str(metric)
 
-    #plt.ylim((0.0,1.0))
-    #plt.xlim((0.0,1.0))
+        #plt.ylim((0.0,1.0))
+        #plt.xlim((0.0,1.0))
 
-    plt.savefig(savestr+".png")
+        plt.savefig(savestr+".png")
+    
+
+
+    return res_dict
 
 
 def run_general_comparison(fold,NT,NE,ELIM,params,agents,mems,average_per=None,Cb=[True,False]):
     NUI,alpha,restrict,use_exp,CV = params
-    global last_rewards_instead
-    last_rewards_instead = False
 
     if type(CV) is list:
         if NT is 1:
@@ -733,8 +749,6 @@ def run_situation_comparison(fold,NE,ELIM,pp,average_per=None,bot_epsilon=1.0):
     use_exp = True
     CV = (len(pp[0]),len(pp[1]))
 
-    global last_rewards_instead
-    last_rewards_instead = True
 
     resolution_per = int(ELIM/20)
 
@@ -781,7 +795,7 @@ def run_situation_comparison(fold,NE,ELIM,pp,average_per=None,bot_epsilon=1.0):
             situation_dict[tuple(pref_profile)] = ag
         #dict constructed
 
-        vote_result = np.zeros(ELIM+1)
+        vote_result = np.zeros(ELIM)
         for experiments in range(NE):
             voteres, _ = test_agents('tabular',False,preferences,situation_dict,ELIM,epsilon=0.1,alpha=alpha,use_exp=use_exp,use_cw=C,DEC=False,restrict=restrict,neural_update_interval=NUI,pbar=pbar)
             vote_result += voteres
@@ -824,6 +838,7 @@ def memory_test(NE):
     pp = unique_nontrival_winner(5,5,'pairwise_comparison',restrict=True,correlation_const=None)
     
     _, agents = test_agents("DQN",'Actions_now',pp,{},alpha=0.01,N_episodes=1000)
+    agents = agents[0]
     progressbar = tqdm(total=NE*2,ncols=100)
 
     for count in range(NE):
@@ -847,8 +862,6 @@ def memory_test(NE):
     plt.show()
 
 def deep_background(tf,alpha,epslen,nt,agent_types,mems,CV,AP=10):
-    global last_rewards_instead
-    last_rewards_instead = False
     opt,vr, metric_results,plurality_results = unique_nontrival_winner(CV[0],CV[1],'borda',restrict=True)
     pp = [opt,vr]
 
@@ -890,14 +903,14 @@ if __name__ == "__main__":
     """
     timefolder = producetimefolder()
 
-    reruns = 2000
+    reruns = 20
     repeats = 5
     eln = 1000
 
     for count in range(repeats):
         opt,vr, metric_results,plurality_results = unique_nontrival_winner(5,5,'borda',restrict=True)
         pp = [opt,vr]
-        #run_situation_comparison(timefolder,reruns,eln,pp,average_per=100,bot_epsilon=0.5)
+        run_situation_comparison(timefolder,reruns,eln,pp,average_per=100,bot_epsilon=0.5)
         #run_situation_comparison(timefolder,reruns,eln,pp,average_per=10,bot_epsilon=0.1)
         #run_situation_comparison(timefolder,reruns,eln,pp,average_per=10,bot_epsilon=1.0)
 

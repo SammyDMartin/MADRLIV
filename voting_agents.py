@@ -5,8 +5,8 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.autograd import Variable
 from torch.distributions import Categorical
-from MARLIV_policy import PolicyGrad
-from MARLIV_dqn import Agent as DQNxR
+from policygrad import PolicyGrad
+from dqn import Agent as DQNxR
 
 def softmax(H):
     h = H - np.max(H)
