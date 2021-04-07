@@ -514,7 +514,7 @@ def test_agents(ag_type,to_remember,pref_profile,agent_dict = {}, N_episodes=100
 
 
 
-def plot_singlepref(fold,mems,agent_types,pref_profile,agent_alpha,N_tests,percent,metric='borda_score',eps_len=1200,updateinterval=2):
+def plot_singlepref(fold,mems,agent_types,pref_profile,agent_alpha,N_tests,percent,metric='borda_score',eps_len=1200,updateinterval=2,disablep=False):
     """[summary]
 
     Args:
@@ -544,7 +544,7 @@ def plot_singlepref(fold,mems,agent_types,pref_profile,agent_alpha,N_tests,perce
 
     limr = N_tests * len(mems)*len(agent_types)
 
-    pbar = tqdm(total=limr,ncols=100)
+    pbar = tqdm(total=limr,ncols=100,disable=disablep)
 
     res_dict = {}
     
@@ -582,36 +582,36 @@ def plot_singlepref(fold,mems,agent_types,pref_profile,agent_alpha,N_tests,perce
             res_dict[(mem,agent_type)] = ls
 
 
-            
-            plt.scatter(x,y,label = str(mem) + "  " + agent_type + " alph=" + str(a))
-        
-    plt.plot(np.linspace(0,1),np.linspace(0,1),'--',linewidth=1.0)
+            if disablep == False:
+                plt.scatter(x,y,label = str(mem) + "  " + agent_type + " alph=" + str(a))
+
+    if disablep == False:        
+        plt.plot(np.linspace(0,1),np.linspace(0,1),'--',linewidth=1.0)
 
 
-    plt.xlabel(metric+' first {}%'.format(int(percent)))
-    plt.ylabel(metric+' last {}%'.format(int(percent)))
+        plt.xlabel(metric+' first {}%'.format(int(percent)))
+        plt.ylabel(metric+' last {}%'.format(int(percent)))
 
-    full_results=metric + ": " + str(metric_results) + "\n" + "plurality" + ": " + str(plurality_results)
-    plt.text(0.05, 0.95, full_results, fontsize=16, bbox=dict(facecolor='blue', alpha=0.2))
-    single_profile = "\nPlurality Winners: {}, {} Winners: {}".format(find_winner(plurality_results),metric,find_winner(metric_results))
+        full_results=metric + ": " + str(metric_results) + "\n" + "plurality" + ": " + str(plurality_results)
+        plt.text(0.05, 0.95, full_results, fontsize=16, bbox=dict(facecolor='blue', alpha=0.2))
+        single_profile = "\nPlurality Winners: {}, {} Winners: {}".format(find_winner(plurality_results),metric,find_winner(metric_results))
 
 
-    title = metric + " e_l " + str(eps_len) + " neural_UI " + str(updateinterval) +"\n" + single_profile
-    #print(title)
+        title = metric + " e_l " + str(eps_len) + " neural_UI " + str(updateinterval) +"\n" + single_profile
+        #print(title)
 
-    plt.legend()
+        plt.legend()
 
-    plt.title(title)
+        plt.title(title)
 
-    if fold is not None:
-        savestr = time.strftime("%H %M %S")
-        savestr = fold+str(savestr)+"2dp_"+str(metric)
+        if fold is not None:
+            savestr = time.strftime("%H %M %S")
+            savestr = fold+str(savestr)+"2dp_"+str(metric)
 
-        #plt.ylim((0.0,1.0))
-        #plt.xlim((0.0,1.0))
+            #plt.ylim((0.0,1.0))
+            #plt.xlim((0.0,1.0))
 
-        plt.savefig(savestr+".png")
-    
+            plt.savefig(savestr+".png")
 
 
     return res_dict
