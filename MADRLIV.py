@@ -398,8 +398,7 @@ def unpack_agentdict(bandit,voting_ranks,agentlist,agentdict):
 
 def test_agents(ag_type,to_remember,pref_profile,agent_dict = {}, N_episodes=1000,epsilon=0.1,alpha=0.1,use_exp=True,use_cw=False,DEC=False,restrict=False,neural_update_interval=2,pbar=None):
     """
-    Generates a test sequence for 
-
+    Given input paramaters generates test string for each agent 
     """
     voting_method='plurality' #has to be
     
@@ -725,7 +724,7 @@ def run_general_comparison(fold,NT,NE,ELIM,params,agents,mems,average_per=None,C
         
         plt.legend()
 
-        plt.ylabel('{} efficiency')
+        plt.ylabel('{} score'.format(kind))
         plt.xlabel('Episode')
 
         savestr = fold+time.strftime("%H %M %S")
@@ -903,6 +902,8 @@ if __name__ == "__main__":
     """
     timefolder = producetimefolder()
 
+    
+    """
     reruns = 20
     repeats = 5
     eln = 1000
@@ -913,11 +914,12 @@ if __name__ == "__main__":
         run_situation_comparison(timefolder,reruns,eln,pp,average_per=100,bot_epsilon=0.5)
         #run_situation_comparison(timefolder,reruns,eln,pp,average_per=10,bot_epsilon=0.1)
         #run_situation_comparison(timefolder,reruns,eln,pp,average_per=10,bot_epsilon=1.0)
-
-    params_list = [4,0.005,True,True,(5,5)]
+    """
+    params_list = [4,0.02,True,True,(5,5)]
     for count in range(10):
-        run_general_comparison(timefolder,NT=1000,NE=1,ELIM=1000,params=params_list,agents=['DQN'],mems=['Actions_now',False],average_per=50,Cb=[False])
+        run_general_comparison(timefolder,NT=10000,NE=1,ELIM=300,params=params_list,agents=['tabular','DQN'],mems=[False,'Actions_now'],average_per=10,Cb=[False])
 
+    """
     timefolder = producetimefolder()
 
     #testing specifics of actions_now vs none with short update and long time horizon
@@ -928,7 +930,7 @@ if __name__ == "__main__":
     timefolder = producetimefolder()
     params_list = [1,0.005,True,True,(5,5)]
     run_general_comparison(timefolder,NT=1000,NE=1,ELIM=1000,params=params_list,agents=['DQN'],mems=['Actions_now',False],average_per=100,Cb=[False])
-
+    """
 
     #do something about eps declining!!
     #testing the bot environment with short update and long time horizon and possibly also 
