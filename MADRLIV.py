@@ -398,7 +398,7 @@ def unpack_agentdict(bandit,voting_ranks,agentlist,agentdict):
 
 def test_agents(ag_type,to_remember,pref_profile,agent_dict = {}, N_episodes=1000,epsilon=0.1,alpha=0.1,use_exp=True,use_cw=False,DEC=False,restrict=False,neural_update_interval=2,pbar=None):
     """
-    Given input paramaters generates test string for each agent 
+    Wrapper around experiment that tests specific comparison metric (borda score/max borda score or condorcet efficiency)
     """
     voting_method='plurality' #has to be
     
@@ -499,14 +499,6 @@ def test_agents(ag_type,to_remember,pref_profile,agent_dict = {}, N_episodes=100
 
 
 
-
-
-
-
-
-
-
-
 # =========================
 # Two Plotting Methods
 # =========================
@@ -514,19 +506,10 @@ def test_agents(ag_type,to_remember,pref_profile,agent_dict = {}, N_episodes=100
 
 
 def plot_singlepref(fold,mems,agent_types,pref_profile,agent_alpha,N_tests,percent,metric='borda_score',eps_len=1200,updateinterval=2,disablep=False):
-    """[summary]
+    """Generates scatter plot of single preference profile for agent, also returns dict of results (bandit objects and agents)
 
-    Args:
-        fold ([type]): [description]
-        mems ([type]): [description]
-        agent_types ([type]): [description]
-        pref_profile ([type]): [description]
-        agent_alpha ([type]): [description]
-        N_tests ([type]): [description]
-        percent ([type]): [description]
-        metric (str, optional): [description]. Defaults to 'borda_score'.
-        eps_len (int, optional): [description]. Defaults to 1200.
-        updateinterval (int, optional): [description]. Defaults to 2.
+    returns:
+        res_dict: dict of result
     """
 
     comparison = Aggregator(inputs=pref_profile)
@@ -536,10 +519,11 @@ def plot_singlepref(fold,mems,agent_types,pref_profile,agent_alpha,N_tests,perce
         metric_results = getattr(comparison,"pairwise_comparison")()
     plurality_results = comparison.plurality()
     
-    if fold is not None:
-        plt.figure(figsize=(20,20))
-    else:
-        plt.figure(figsize=(15,15))
+    if disablep==False:
+        if fold is not None:
+            plt.figure(figsize=(20,20))
+        else:
+            plt.figure(figsize=(15,15))
 
     limr = N_tests * len(mems)*len(agent_types)
 
@@ -617,7 +601,13 @@ def plot_singlepref(fold,mems,agent_types,pref_profile,agent_alpha,N_tests,perce
 
 
 def run_general_comparison(fold,NT,NE,ELIM,params,agents,mems,average_per=None,Cb=[True,False]):
+    """
+    Doesn't return anything - used to generate fast plot comparing score (Cb = borda score if False, condorcet eff if True)
+    for many reruns of preference profile
+    """
     NUI,alpha,restrict,use_exp,CV = params
+
+    epsilon = 0.1
 
     if type(CV) is list:
         if NT is 1:
@@ -694,11 +684,11 @@ def run_general_comparison(fold,NT,NE,ELIM,params,agents,mems,average_per=None,C
                             preferences = unique_nontrival_winner(CV[0],CV[1],'borda',restrict=restrict,correlation_const=None)
                             
                             for experiments in range(NE):
-                                voteres, _ = test_agents(agent_kind,mem,preferences,{},ELIM,epsilon=0.1,alpha=a,use_exp=use_exp,use_cw=C,DEC=False,restrict=restrict,neural_update_interval=NUI,pbar=pbar)
+                                voteres, _ = test_agents(agent_kind,mem,preferences,{},ELIM,epsilon=epsilon,alpha=a,use_exp=use_exp,use_cw=C,DEC=False,restrict=restrict,neural_update_interval=NUI,pbar=pbar)
                                 vote_result += voteres
                 elif NT == 1:
                     for experiments in range(NE):
-                        voteres, _ = test_agents(agent_kind,mem,preferences,{},ELIM,epsilon=0.1,alpha=a,use_exp=use_exp,use_cw=C,DEC=False,restrict=restrict,neural_update_interval=NUI,pbar=pbar)
+                        voteres, _ = test_agents(agent_kind,mem,preferences,{},ELIM,epsilon=epsilon,alpha=a,use_exp=use_exp,use_cw=C,DEC=False,restrict=restrict,neural_update_interval=NUI,pbar=pbar)
                         vote_result += voteres
 
 
