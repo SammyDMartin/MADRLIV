@@ -65,9 +65,9 @@ class Agent:
         self.alpha = alpha
         self.k = np.zeros(bandit.N, dtype=np.int)  # number of times action was chosen
         self.Q = np.zeros(bandit.N, dtype=np.float)  # estimated value
-        #if ranks:
-        #    for idx,_ in enumerate(self.Q):
-        #        self.Q = self.alpha*np.array(util_from_ranks(ranks)) #preload utilities
+        if ranks:
+            for idx,_ in enumerate(self.Q):
+                self.Q = self.alpha*np.array(util_from_ranks(ranks)) #preload utilities
     
     # Update Q action-value using:
     # Q(a) <- Q(a) + 1/(k+1) * (r(a) - Q(a))

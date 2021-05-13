@@ -277,8 +277,7 @@ def experiment(agents, bandit, N_episodes, decline,voting_method,use_exp,options
     return out
 
 
-
-
+    
 
 # =========================
 # Filter preference profiles
@@ -348,12 +347,19 @@ def generate_agent(ag_type,bandit,epsilon,alpha,update_interval,memory=False,bot
 
     if memory not in [False,'Rewards','Actions','Actions_now']:
         print(memory, ag_type,"No such agent exists")
-        return
+        raise InterruptedError
 
     if ag_type is 'grad':
         return Gradient_Agent(bandit, epsilon, alpha)  # initialize agent
     elif ag_type is 'tabular':
         return Agent(bandit, epsilon, alpha)  # initialize agent
+    
+    elif ag_type is 'tabular_truthful':
+        if bot_prefs is not None:
+            return Agent(bandit,epsilon,alpha,ranks=bot_prefs)
+        else:
+            print("No agent_prefs")
+        
     elif ag_type is 'neural':
         return Neural_Agent(bandit,epsilon,alpha,remember=memory,UI=update_interval,algorithm='policygrad')
     elif ag_type is 'DQN':
@@ -905,6 +911,8 @@ if __name__ == "__main__":
         #run_situation_comparison(timefolder,reruns,eln,pp,average_per=10,bot_epsilon=0.1)
         #run_situation_comparison(timefolder,reruns,eln,pp,average_per=10,bot_epsilon=1.0)
     """
+    
+
     params_list = [4,0.02,True,True,(5,5)]
     for count in range(10):
         run_general_comparison(timefolder,NT=10000,NE=1,ELIM=300,params=params_list,agents=['tabular','DQN'],mems=[False,'Actions_now'],average_per=10,Cb=[False])
