@@ -4,7 +4,7 @@ from MADRLIV_sequential import agent_experiment
 
 from MADRLIV import util_from_ranks
 import numpy as np
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 import pickle
 
 mems = [False,'Actions_now'] #types of agent memory to record
@@ -15,7 +15,7 @@ agent_types = ['DQN','DQN_truthful','tabular','tabular_truthful'] #types of agen
 #agent_types = ['DQN','DQN_truthful']
 #agent_types = ['tabular_truthful','tabular']
 
-N_pref=1000
+N_pref=2000
 
 SEQ = False
 #use sequential or simultaneous
@@ -52,7 +52,7 @@ else:
     total = N_pref*len(agent_types)*len(mems)*nt
     vote_histories = {}
     vote_histories_seq = {}
-    pbar = tqdm(total=total)
+    pbar = tqdm(total=total, ncols=200)
 
     for tests in range(N_pref):
         opt,vr, metric_results,plurality_results = unique_nontrival_winner(CV[0],CV[1],'borda',restrict=RES)
@@ -81,6 +81,8 @@ else:
                     else:
                         a = alpha
                     bd = agent_experiment(ag_type=ag_type,to_remember=mem,pref_profile=pp,N_episodes=epslen,epsilon=0.1,alpha=a,use_exp=True,neural_update_interval=2,sequential=SEQ)
+
+
                     
                     if SEQ == True:
                         final_winners = bd[1]['winners']
@@ -91,9 +93,12 @@ else:
                         result_seq = (bd[0].vote_history, bd[0].vote_winners,(bd[0].poll,bd[0].moves),opt,vr)
                         reslist.append(result)
                         reslist_seq.append(result_seq)
+                        desc = "{}-{}, R:{}".format(ag_type,mem,round(np.mean(bd[1]['rewards'][-100:]),3))
                     elif SEQ == False:
                         result = (bd.vote_history, bd.vote_winners,opt,vr)
+                        desc = "{}-{}".format(ag_type,mem)
                         reslist.append(result)
+                    pbar.set_description(desc)
                         
 
                 vote_histories[MA]=reslist
