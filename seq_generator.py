@@ -98,7 +98,7 @@ else:
                         result = (bd.vote_history, bd.vote_winners,opt,vr)
                         desc = "{}-{}".format(ag_type,mem)
                         reslist.append(result)
-                    pbar.set_description(desc)
+                    #pbar.set_description(desc)
                         
 
                 vote_histories[MA]=reslist
