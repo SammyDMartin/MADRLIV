@@ -15,12 +15,12 @@ agent_types = ['DQN','DQN_truthful','tabular','tabular_truthful'] #types of agen
 #agent_types = ['DQN','DQN_truthful']
 #agent_types = ['tabular_truthful','tabular']
 
-N_pref=2000
+N_pref=100
 
-SEQ = False
+SEQ = True
 #use sequential or simultaneous
 
-RES = True
+RES = False
 #restrict preference profiles?
 
 DP=False
@@ -33,13 +33,13 @@ V = 7
 CV = (C,V)
 
 
-alpha = 0.1
-alpha_dqn = 0.01
+alpha = 0.01
+alpha_dqn = 0.002
 nt = 1
 epslen = 500
 
 filename = None
-savename = 'simultaneous_1000_0.1_0.01'
+savename = 'sequential_0.02_0.002'
 
 A_test = False
 
