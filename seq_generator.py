@@ -15,7 +15,7 @@ agent_types = ['DQN','DQN_truthful','tabular','tabular_truthful'] #types of agen
 #agent_types = ['DQN','DQN_truthful']
 #agent_types = ['tabular_truthful','tabular']
 
-N_pref=100
+N_pref=250
 
 SEQ = True
 #use sequential or simultaneous
