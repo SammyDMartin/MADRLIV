@@ -10,6 +10,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+#from numba import jit
+
 class QNetwork(nn.Module):
     """Actor (Policy) Model."""
 
@@ -31,7 +33,8 @@ class QNetwork(nn.Module):
         self.fc1 = nn.Linear(state_size, fc1_units)
         self.fc2 = nn.Linear(fc1_units, fc2_units)
         self.fc3 = nn.Linear(fc2_units, action_size)
-
+    
+    #@jit
     def forward(self, state):
         """Build a network that maps state -> action values."""
         x = F.relu(self.fc1(state))
@@ -70,6 +73,7 @@ class Agent():
         # Initialize time step (for updating every UPDATE_EVERY steps)
         self.t_step = 0
     
+    #@jit
     def step(self, state, action, reward, next_state, done):
         # Save experience in replay memory
         self.memory.add(state, action, reward, next_state, done)
@@ -82,6 +86,7 @@ class Agent():
                 experiences = self.memory.sample()
                 self.learn(experiences)
 
+    #@jit
     def act(self, state, eps=0.):
         """Returns actions for given state as per current policy.
         
@@ -102,6 +107,7 @@ class Agent():
         else:
             return random.choice(np.arange(self.action_size))
 
+    #@jit
     def learn(self, experiences):
         """Update value parameters using given batch of experience tuples.
 
@@ -130,6 +136,7 @@ class Agent():
         # ------------------- update target network ------------------- #
         self.soft_update(self.qnetwork_local, self.qnetwork_target, self.tau)                     
 
+    #@jit
     def soft_update(self, local_model, target_model, tau):
         """Soft update model parameters.
         θ_target = τ*θ_local + (1 - τ)*θ_target
@@ -163,11 +170,13 @@ class ReplayBuffer:
         self.experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
         self.seed = torch.random.seed()
     
+    #@jit
     def add(self, state, action, reward, next_state, done):
         """Add a new experience to memory."""
         e = self.experience(state, action, reward, next_state, done)
         self.memory.append(e)
     
+    #@jit
     def sample(self):
         """Randomly sample a batch of experiences from memory."""
         experiences = random.sample(self.memory, k=self.batch_size)

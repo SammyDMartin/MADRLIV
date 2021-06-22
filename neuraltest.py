@@ -1,5 +1,5 @@
-from MARLIV_agents import Neural_Agent
-from MARLIV_agents import Agent
+from voting_agents import Neural_Agent
+from voting_agents import Agent
 from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
@@ -59,4 +59,4 @@ plt.plot(base,flat,label = 'Dumb')
 plt.plot(base,neur,label = 'Neural')
 plt.xscale('log')
 plt.legend()
-plt.savefig("neural_trajectory.png")
+plt.show()

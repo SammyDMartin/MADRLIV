@@ -33,8 +33,8 @@ V = 7
 CV = (C,V)
 
 
-alpha = 0.01
-alpha_dqn = 0.002
+alpha = 0.02
+alpha_dqn = 0.005
 nt = 1
 epslen = 500
 
